@@ -114,7 +114,7 @@ Tick **Surround sound** in the Phones window. A map appears with you in the midd
 - **Each phone plays one channel (mono)** in surround mode. With surround off, every ticked phone plays the same stereo sound.
 - Positions, ticks and the surround setting are remembered per phone in `%APPDATA%\Sidespeaker\layout.ini`.
 
-Phones are not synchronised with each other beyond the shared stream. Each app has its own buffer, so mixing iPhones and Androids, or locking an iPhone, can shift timing by a few hundred milliseconds. For the tightest result use the same kind of phone with the screen on.
+Phones are not synchronised with each other beyond the shared stream. Each app has its own buffer, so phones can play at different times. For the tightest result use the same kind of phone.
 
 ## Configuration
 
@@ -138,8 +138,8 @@ Phones are not synchronised with each other beyond the shared stream. Each app h
 | `SidePort` | 5000 | Port the app listens on. |
 | `SidePrebufferMs` | 30 | Audio queued before playback starts (screen on). |
 | `SideMaxBufferMs` | 60 | Maximum queue before playback resyncs to newer audio (screen on). |
-| `SideBgPrebufferMs` | 300 | Same as the prebuffer, while in the background or locked. |
-| `SideBgMaxBufferMs` | 450 | Same as the maximum queue, while in the background or locked. |
+| `SideBgPrebufferMs` | `SidePrebufferMs` | Optional override for the prebuffer while in the background or locked. |
+| `SideBgMaxBufferMs` | `SideMaxBufferMs` | Optional override for the maximum queue while in the background or locked. |
 | `SideTimeoutMs` | 3000 | Disconnect if no data arrives for this long. |
 
 ### Android (`android/app/src/main/res/values/config.xml`)
@@ -158,7 +158,7 @@ Phone settings take effect after a rebuild and reinstall.
 
 - **Crackling or cuts:** raise the prebuffer values. Both apps show the current buffer level and an underrun count on screen.
 - **Too much delay:** lower the prebuffer and maximum values. Smaller buffers are less forgiving.
-- **iPhone, locked screen:** iOS throttles background apps, so the background values are deeper on purpose. Turn off Low Power Mode if it still stutters.
+- **iPhone, locked screen:** if playback stutters, raise `SideBgPrebufferMs` and `SideBgMaxBufferMs` in `ios/project.yml`. A deeper buffer adds delay.
 
 ## Troubleshooting
 

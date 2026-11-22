@@ -37,10 +37,12 @@ final class Receiver: ObservableObject {
     init() {
         let info = Bundle.main.infoDictionary
         port = UInt16((info?["SidePort"] as? Int) ?? 5000)
-        prebufferMs = (info?["SidePrebufferMs"] as? Int) ?? 30
-        maxBufferMs = (info?["SideMaxBufferMs"] as? Int) ?? 60
-        bgPrebufferMs = (info?["SideBgPrebufferMs"] as? Int) ?? 300
-        bgMaxBufferMs = (info?["SideBgMaxBufferMs"] as? Int) ?? 800
+        let prebuffer = (info?["SidePrebufferMs"] as? Int) ?? 30
+        let maxBuffer = (info?["SideMaxBufferMs"] as? Int) ?? 60
+        prebufferMs = prebuffer
+        maxBufferMs = maxBuffer
+        bgPrebufferMs = (info?["SideBgPrebufferMs"] as? Int) ?? prebuffer
+        bgMaxBufferMs = (info?["SideBgMaxBufferMs"] as? Int) ?? maxBuffer
         timeout = Double((info?["SideTimeoutMs"] as? Int) ?? 3000) / 1000.0
         engine.attach(player)
         let nc = NotificationCenter.default
@@ -219,8 +221,6 @@ final class Receiver: ObservableObject {
     private func setMode(background: Bool) {
         isBackground = background
         applyBuffers()
-        guard fmt != nil else { return }
-        resetPlaybackQueue()
     }
 
     private func resetPlaybackQueue() {
