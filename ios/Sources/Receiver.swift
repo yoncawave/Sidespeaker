@@ -19,6 +19,7 @@ final class Receiver: ObservableObject {
     private var playing = false
     private var rateHz = 48000
     private var underruns = 0
+    private var resyncs = 0
     private var isBackground = false
     private var prebufferFrames = 0
     private var maxFrames = 0
@@ -36,8 +37,8 @@ final class Receiver: ObservableObject {
     init() {
         let info = Bundle.main.infoDictionary
         port = UInt16((info?["SidePort"] as? Int) ?? 5000)
-        prebufferMs = (info?["SidePrebufferMs"] as? Int) ?? 60
-        maxBufferMs = (info?["SideMaxBufferMs"] as? Int) ?? 200
+        prebufferMs = (info?["SidePrebufferMs"] as? Int) ?? 30
+        maxBufferMs = (info?["SideMaxBufferMs"] as? Int) ?? 60
         bgPrebufferMs = (info?["SideBgPrebufferMs"] as? Int) ?? 300
         bgMaxBufferMs = (info?["SideBgMaxBufferMs"] as? Int) ?? 800
         timeout = Double((info?["SideTimeoutMs"] as? Int) ?? 3000) / 1000.0
@@ -61,6 +62,7 @@ final class Receiver: ObservableObject {
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.playback)
+            try? session.setPreferredIOBufferDuration(0.005)
             try session.setActive(true)
             setupNowPlaying()
             let l = try NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: port)!)
@@ -74,7 +76,12 @@ final class Receiver: ObservableObject {
                 if Date().timeIntervalSince(self.lastData) > self.timeout { self.teardown(); return }
                 if self.fmt != nil {
                     let ms = self.queuedFrames * 1000 / max(1, self.rateHz)
-                    self.setStatus("Streaming \(self.rateHz) Hz\nbuffer \(ms) ms · underruns \(self.underruns)")
+                    let route = session.currentRoute.outputs.map(\.portName).joined(separator: ", ")
+                    let ioMs = Int((session.ioBufferDuration * 1000).rounded())
+                    let outputMs = Int((session.outputLatency * 1000).rounded())
+                    let queueStatus = "buffer \(ms) ms · underruns \(self.underruns) · resyncs \(self.resyncs)"
+                    let routeStatus = "\(route) · I/O \(ioMs) ms · output \(outputMs) ms"
+                    self.setStatus("Streaming \(self.rateHz) Hz\n\(queueStatus)\n\(routeStatus)")
                 }
             }
             t.resume()
@@ -140,6 +147,7 @@ final class Receiver: ObservableObject {
             channels = Int(ch)
             rateHz = Int(rate)
             underruns = 0
+            resyncs = 0
             fmt = f
             applyBuffers()
             queuedFrames = 0
@@ -156,14 +164,17 @@ final class Receiver: ObservableObject {
         }
         guard let f = fmt else { return }
         let ch = channels
-        let frames = buf.count / (2 * ch)
-        if frames == 0 { return }
-        let bytes = frames * 2 * ch
-
-        if queuedFrames + frames > maxFrames {
-            buf.removeSubrange(0..<bytes)
-            return
+        let bytesPerFrame = 2 * ch
+        let receivedFrames = buf.count / bytesPerFrame
+        if receivedFrames == 0 { return }
+        var firstFrame = 0
+        if queuedFrames + receivedFrames > maxFrames {
+            // Stop playing stale audio and restart from the newest available frames.
+            resetPlaybackQueue()
+            resyncs += 1
+            firstFrame = max(0, receivedFrames - prebufferFrames)
         }
+        let frames = receivedFrames - firstFrame
 
         guard let pcm = AVAudioPCMBuffer(pcmFormat: f, frameCapacity: AVAudioFrameCount(frames)),
               let chData = pcm.floatChannelData else { return }
@@ -171,16 +182,17 @@ final class Receiver: ObservableObject {
         buf.withUnsafeBytes { raw in
             for i in 0..<frames {
                 for c in 0..<ch {
-                    let v = raw.loadUnaligned(fromByteOffset: (i * ch + c) * 2, as: Int16.self)
+                    let offset = (i + firstFrame) * bytesPerFrame + c * 2
+                    let v = raw.loadUnaligned(fromByteOffset: offset, as: Int16.self)
                     chData[c][i] = Float(Int16(littleEndian: v)) / 32768.0
                 }
             }
         }
-        buf.removeSubrange(0..<bytes)
+        buf.removeSubrange(0..<(receivedFrames * bytesPerFrame))
 
         queuedFrames += frames
         let g = generation
-        player.scheduleBuffer(pcm, completionCallbackType: .dataPlayedBack) { [weak self] _ in
+        player.scheduleBuffer(pcm, completionCallbackType: .dataRendered) { [weak self] _ in
             self?.queue.async {
                 guard let self = self, g == self.generation else { return }
                 self.queuedFrames = max(0, self.queuedFrames - frames)
@@ -200,14 +212,18 @@ final class Receiver: ObservableObject {
     private func applyBuffers() {
         let pre = isBackground ? bgPrebufferMs : prebufferMs
         let mx = isBackground ? bgMaxBufferMs : maxBufferMs
-        prebufferFrames = rateHz * pre / 1000
-        maxFrames = rateHz * mx / 1000
+        prebufferFrames = max(1, rateHz * pre / 1000)
+        maxFrames = max(prebufferFrames, rateHz * mx / 1000)
     }
 
     private func setMode(background: Bool) {
         isBackground = background
         applyBuffers()
         guard fmt != nil else { return }
+        resetPlaybackQueue()
+    }
+
+    private func resetPlaybackQueue() {
         generation += 1
         player.stop()
         queuedFrames = 0

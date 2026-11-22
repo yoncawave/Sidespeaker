@@ -7,7 +7,10 @@ targets:
   Sidespeaker:
     type: application
     platform: iOS
-    sources: [Sources]
+    sources:
+      - Sources
+      - path: ../LICENSE
+        buildPhase: resources
     info:
       path: Info.plist
       properties:
@@ -15,8 +18,8 @@ targets:
         UILaunchScreen: {}
         UIBackgroundModes: [audio]
         SidePort: 5000
-        SidePrebufferMs: 60
-        SideMaxBufferMs: 200
+        SidePrebufferMs: 30
+        SideMaxBufferMs: 60
         SideBgPrebufferMs: 300
         SideBgMaxBufferMs: 450
         SideTimeoutMs: 3000

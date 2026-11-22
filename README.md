@@ -136,8 +136,8 @@ Phones are not synchronised with each other beyond the shared stream. Each app h
 | Key | Default | Meaning |
 |---|---|---|
 | `SidePort` | 5000 | Port the app listens on. |
-| `SidePrebufferMs` | 60 | Audio queued before playback starts (screen on). |
-| `SideMaxBufferMs` | 200 | Maximum queue before audio is dropped (screen on). |
+| `SidePrebufferMs` | 30 | Audio queued before playback starts (screen on). |
+| `SideMaxBufferMs` | 60 | Maximum queue before playback resyncs to newer audio (screen on). |
 | `SideBgPrebufferMs` | 300 | Same as the prebuffer, while in the background or locked. |
 | `SideBgMaxBufferMs` | 450 | Same as the maximum queue, while in the background or locked. |
 | `SideTimeoutMs` | 3000 | Disconnect if no data arrives for this long. |
