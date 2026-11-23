@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 jobs:
   ipa:
-    runs-on: macos-latest
+    runs-on: macos-26-intel
     defaults:
       run:
         working-directory: ios
