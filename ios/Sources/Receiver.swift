@@ -4,6 +4,11 @@ import AVFoundation
 import MediaPlayer
 import UIKit
 
+enum LatencyMode: String {
+    case normal
+    case fast
+}
+
 final class Receiver: ObservableObject {
     @Published var status = "Starting"
 
@@ -20,6 +25,7 @@ final class Receiver: ObservableObject {
     private var rateHz = 48000
     private var underruns = 0
     private var resyncs = 0
+    private var latencyMode: LatencyMode = .fast
     private var isBackground = false
     private var prebufferFrames = 0
     private var maxFrames = 0
@@ -47,10 +53,21 @@ final class Receiver: ObservableObject {
         engine.attach(player)
         let nc = NotificationCenter.default
         nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
-            self?.queue.async { self?.setMode(background: true) }
+            self?.queue.async { self?.setBackground(true) }
         }
         nc.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: nil) { [weak self] _ in
-            self?.queue.async { self?.setMode(background: false) }
+            self?.queue.async { self?.setBackground(false) }
+        }
+    }
+
+    func setLatencyMode(_ mode: LatencyMode) {
+        queue.async {
+            guard self.latencyMode != mode else { return }
+            self.latencyMode = mode
+            self.applyBuffers()
+            if self.fmt != nil {
+                self.resetPlaybackQueue()
+            }
         }
     }
 
@@ -212,15 +229,24 @@ final class Receiver: ObservableObject {
     }
 
     private func applyBuffers() {
-        let pre = isBackground ? bgPrebufferMs : prebufferMs
-        let mx = isBackground ? bgMaxBufferMs : maxBufferMs
-        prebufferFrames = max(1, rateHz * pre / 1000)
-        maxFrames = max(prebufferFrames, rateHz * mx / 1000)
+        let buffer: (startMs: Int, limitMs: Int)
+        switch (latencyMode, isBackground) {
+        case (.normal, false): buffer = (60, 200)
+        case (.normal, true): buffer = (300, 450)
+        case (.fast, false): buffer = (prebufferMs, maxBufferMs)
+        case (.fast, true): buffer = (bgPrebufferMs, bgMaxBufferMs)
+        }
+        prebufferFrames = max(1, rateHz * buffer.startMs / 1000)
+        maxFrames = max(prebufferFrames, rateHz * buffer.limitMs / 1000)
     }
 
-    private func setMode(background: Bool) {
+    private func setBackground(_ background: Bool) {
+        guard isBackground != background else { return }
         isBackground = background
         applyBuffers()
+        if latencyMode == .normal && fmt != nil {
+            resetPlaybackQueue()
+        }
     }
 
     private func resetPlaybackQueue() {

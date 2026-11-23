@@ -133,13 +133,15 @@ Phones are not synchronised with each other beyond the shared stream. Each app h
 
 ### iPhone (`ios/project.yml`, under `info.properties`)
 
+Choose **Fast** or **Normal** in the iPhone app. Fast is the default and uses the 30 ms start buffer on the lock screen too. Normal starts with 60 ms when the app is open and 300 ms when it is locked. The app remembers the selected mode.
+
 | Key | Default | Meaning |
 |---|---|---|
 | `SidePort` | 5000 | Port the app listens on. |
-| `SidePrebufferMs` | 30 | Audio queued before playback starts (screen on). |
-| `SideMaxBufferMs` | 60 | Maximum queue before playback resyncs to newer audio (screen on). |
-| `SideBgPrebufferMs` | `SidePrebufferMs` | Optional override for the prebuffer while in the background or locked. |
-| `SideBgMaxBufferMs` | `SideMaxBufferMs` | Optional override for the maximum queue while in the background or locked. |
+| `SidePrebufferMs` | 30 | Fast: audio queued before playback starts (screen on). |
+| `SideMaxBufferMs` | 60 | Fast: maximum queue before playback resyncs to newer audio (screen on). |
+| `SideBgPrebufferMs` | `SidePrebufferMs` | Fast: optional prebuffer override while in the background or locked. |
+| `SideBgMaxBufferMs` | `SideMaxBufferMs` | Fast: optional maximum queue override while in the background or locked. |
 | `SideTimeoutMs` | 3000 | Disconnect if no data arrives for this long. |
 
 ### Android (`android/app/src/main/res/values/config.xml`)
@@ -158,7 +160,7 @@ Phone settings take effect after a rebuild and reinstall.
 
 - **Crackling or cuts:** raise the prebuffer values. Both apps show the current buffer level and an underrun count on screen.
 - **Too much delay:** lower the prebuffer and maximum values. Smaller buffers are less forgiving.
-- **iPhone, locked screen:** if playback stutters, raise `SideBgPrebufferMs` and `SideBgMaxBufferMs` in `ios/project.yml`. A deeper buffer adds delay.
+- **iPhone, locked screen:** if playback stutters in Fast, try Normal. To tune Fast further, raise `SideBgPrebufferMs` and `SideBgMaxBufferMs` in `ios/project.yml`. A deeper buffer adds delay.
 
 ## Troubleshooting
 
