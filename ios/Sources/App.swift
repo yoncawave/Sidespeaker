@@ -11,7 +11,7 @@ struct SidespeakerApp: App {
                 Text("Sidespeaker").font(.largeTitle)
                 Text(rx.status).foregroundColor(.secondary).multilineTextAlignment(.center)
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(spacing: 8) {
                     Text("Latency mode").font(.subheadline.weight(.semibold))
                     Picker("Latency mode", selection: $latencyMode) {
                         Text("Normal").tag(LatencyMode.normal)
@@ -27,6 +27,7 @@ struct SidespeakerApp: App {
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: 284)
+                .multilineTextAlignment(.center)
                 .padding(.top, 8)
             }
             .padding(.horizontal, 24)
